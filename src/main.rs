@@ -32,6 +32,13 @@ pub enum Mode {
     SearchIt,
 }
 
+#[derive(PartialEq, Copy, Clone)]
+pub enum CurserState {
+    LeftNibble,
+    RightNibble,
+    Ascii,
+}
+
 fn main() {
     let mut buf = vec![];
     let mut cursorpos: usize = 0;

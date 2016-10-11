@@ -33,7 +33,7 @@ pub enum Mode {
 }
 
 #[derive(PartialEq, Copy, Clone)]
-pub enum CurserState {
+pub enum CursorState {
     LeftNibble,
     RightNibble,
     Ascii,
@@ -43,7 +43,7 @@ fn main() {
     let mut buf = vec![];
     let mut cursorpos: usize = 0;
     // 0 is left nibble, 1 is right nibble, 2 is ascii
-    let mut cursorstate: usize = 0;
+    let mut cursorstate: CursorState = CursorState::LeftNibble;
     // 0 = display data from first line of file
     let mut screenoffset: usize = 0;
     const SPALTEN: usize = 16;
@@ -132,20 +132,20 @@ fn main() {
         if mode == Mode::Command {
             match key as char {
                 'h' => {
-                    if cursorstate == 2 {
+                    if cursorstate == CursorState::Ascii {
                         // ascii mode
                         if cursorpos > 0 {
                             // not at start
                             cursorpos -= 1; // go left
                         }
-                    } else if cursorstate == 1 {
+                    } else if cursorstate == CursorState::RightNibble {
                         // hex mode, right nibble
-                        cursorstate = 0; // left nibble
-                    } else if cursorstate == 0 {
+                        cursorstate = CursorState::LeftNibble; // left nibble
+                    } else if cursorstate == CursorState::LeftNibble {
                         // hex mode, left nibble
                         if cursorpos > 0 {
                             // not at start
-                            cursorstate = 1; // right nibble
+                            cursorstate = CursorState::RightNibble; // right nibble
                             cursorpos -= 1; // go left
                         }
                     }
@@ -168,20 +168,20 @@ fn main() {
                     }
                 }
                 'l' => {
-                    if cursorstate == 2 {
+                    if cursorstate == CursorState::Ascii {
                         // ascii mode
                         if cursorpos < buf.len() - 1 {
                             // not at end
                             cursorpos += 1; // go right
                         }
-                    } else if cursorstate == 0 {
+                    } else if cursorstate == CursorState::LeftNibble {
                         // hex mode, left nibble
                         cursorstate = 1; // right nibble
                     } else if cursorstate == 1 {
                         // hex mode, right nibble
                         if cursorpos < buf.len() - 1 {
                             // not at end
-                            cursorstate = 0; // left nibble
+                            cursorstate = CursorState::LeftNibble; // left nibble
                             cursorpos += 1; // go right
                         }
                     }
@@ -190,7 +190,7 @@ fn main() {
                     cursorpos -= cursorpos % SPALTEN; // jump to start of line
                     if cursorstate == 1 {
                         // hex mode, right nibble
-                        cursorstate = 0; // left nibble
+                        cursorstate = CursorState::LeftNibble; // left nibble
                     }
                 }
                 '$' => {
@@ -200,7 +200,7 @@ fn main() {
                     } else {
                         cursorpos = buf.len() - 1 // jump to end of line
                     }
-                    if cursorstate == 0 {
+                    if cursorstate == CursorState::LeftNibble {
                         // hex mode, left nibble
                         cursorstate = 1; // right nibble
                     }
@@ -225,11 +225,11 @@ fn main() {
                     mode = Mode::TypeCommand;
                 }
                 'J' => {
-                    if cursorstate == 2 {
+                    if cursorstate == CursorState::Ascii {
                         // ascii mode
                         cursorstate = 0; // hex mode, left nibble
                     } else {
-                        cursorstate = 2; // jump to ascii
+                        cursorstate = CursorState::Ascii; // jump to ascii
                     }
                 }
                 '?' => {
@@ -252,7 +252,7 @@ fn main() {
                 screenoffset -= 1; // move screen
             }
 
-        } else if mode == Mode::Replace && cursorstate == 2 {
+        } else if mode == Mode::Replace && cursorstate == CursorState::Ascii {
             // r was pressed so replace next char in ascii mode
             match key {
                 c @ 32...126 => buf[cursorpos] = c,
@@ -260,8 +260,8 @@ fn main() {
             }
             mode = Mode::Command;
         } else if mode == Mode::Replace {
-            let mask = if cursorstate == 0 { 0x0F } else { 0xF0 };
-            let shift = if cursorstate == 0 { 4 } else { 0 };
+            let mask = if cursorstate == CursorState::LeftNibble { 0x0F } else { 0xF0 };
+            let shift = if cursorstate == CursorState::LeftNibble { 4 } else { 0 };
             // Change the selected nibble
             if let Some(c) = (key as char).to_digit(16) {
                 buf[cursorpos] = buf[cursorpos] & mask | (c as u8) << shift;
@@ -299,7 +299,7 @@ fn main() {
                 _ => (),
             }
         } else if mode == Mode::Insert {
-            if cursorstate == 0 {
+            if cursorstate == CursorState::LeftNibble {
                 // Left nibble
                 match key {
                     c @ 65... 70 => // A-F
@@ -323,7 +323,7 @@ fn main() {
                     27 => {mode = Mode::Command;},
                     _ => ()
                 }
-            } else if cursorstate == 2 {
+            } else if cursorstate == CursorState::Ascii {
                 // Ascii
                 match key {
                     c @ 32...126 => {
@@ -337,7 +337,7 @@ fn main() {
                 }
             }
         } else if mode == Mode::TypeSearch {
-            //            if cursorstate == 2 { // Ascii search
+            //            if cursorstate == CursorState::Ascii { // Ascii search
             match key {
                 c @ 32...126 => {
                     command.push(c as char);
